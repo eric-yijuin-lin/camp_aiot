@@ -19,10 +19,9 @@ def get_class_label(results, model):
     label = names[index]
     return label
 
-def detect_image(source_image):
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    print(os.getcwd())
-    filename = f"src/img/detect/latest.jpg"
+def detect_image(source_image, save_detected=True):
+    # print(os.getcwd())
+    filename = f"static/img/detect/latest.jpg"
     results = model.predict(
         source_image, # 影像
         conf=0.5, # 信心門檻值
@@ -65,33 +64,13 @@ def esp32_capture():
             return "Decode error", 400
 
         # 丟給 YOLO 做偵測
-        object = detect_image(img)
+        label = detect_image(img, True)
         return "ok"
+    
+@app.route("/yolo_display")
+def yolo_display():
+    return render_template("yolo_display.html")
 
-@app.route("/esp32-upload", methods=["GET", "POST"])
-def test_upload():
-    if request.method == "GET":
-        return render_template("test_upload.html")
-    elif request.method == "POST":
-        if "file" not in request.files:
-            print("[debug] /esp32-upload: No file part")
-            return 400, "No file part"
-        file = request.files["file"]
-        if file.filename == "":
-            print("[debug] /esp32-upload: No selected file")
-            return 400, "No selected file"
-        
-        file_prefix = Path(file.filename).stem
-        file_surffix = Path(file.filename).suffix
-        time_str = datetime.now().strftime("%Y-%m-%d %H%M%S")
-        file_name = f"{file_prefix} {time_str}{file_surffix}"
-        full_name = f"C:/Users/user/Documents/temp/{file_name}"
-        file.save(full_name)
-
-        return "image saved"
-  
-
-
-app.run(host="0.0.0.0", port=5000)
+app.run(host="0.0.0.0", port=5000, threaded=True, debug=False, use_reloader=False)
 
   

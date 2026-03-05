@@ -8,5 +8,5 @@ wheels/
 
 # Virtual environments
 .venv
-src/img
+static/img
 yolov8m.pt
