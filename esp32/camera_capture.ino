@@ -115,6 +115,13 @@ void setupCamera()
   }
 }
 
+void ensureWifiConnection() {
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
+}
+
 void setup() {
   // WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); 
   Serial.begin(115200);
@@ -128,11 +135,9 @@ void setup() {
   Serial.println();
   Serial.print("Connecting to ");
   Serial.println(ssid);
-  WiFi.begin(ssid, password);  
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print(".");
-    delay(500);
-  }
+  WiFi.begin(ssid, password);
+  ensureWifiConnection();
+  
   Serial.println();
   Serial.print("ESP32-CAM IP Address: ");
   Serial.println(WiFi.localIP());
@@ -142,7 +147,11 @@ void setup() {
   setupCamera();
 }
 
-void loop() {camera_fb_t * fb = NULL;
+void loop() {
+  if (WiFi.status() != WL_CONNECTED) {
+    ensureWifiConnection();
+  }
+  camera_fb_t * fb = NULL;
   fb = esp_camera_fb_get();
   if(!fb) {
     Serial.println("Camera capture failed");
