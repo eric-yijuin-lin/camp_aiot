@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <title>國一 AI 實驗室：直觀對齊版</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+  <style>
+    :root { --blue:#3498db; --red:#e74c3c; --gold:#ffd700; --bg:#1a1a2e; }
+
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'PingFang TC','Microsoft JhengHei',sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+      margin: 0;
+    }
+
+    /* ✅ 讓整體 container 變寬一點，但不全版 */
+    #app {
+      background: white;
+      padding: 25px;
+      border-radius: 20px;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+      width: min(1400px, 96vw);
+    }
+
+    /* ✅ 左(主要內容) + 右(預測區) */
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 22px;
+      align-items: start;
+    }
+
+    .left-col { min-width: 0; } /* 避免 grid 內容撐爆 */
+    .right-col { min-width: 0; }
+
+    /* 原本：左側照片 + 神經網路 */
+    .main-layout { display: grid; grid-template-columns: 280px 1fr; gap: 25px; }
+
+    /* 左側照片觀察區 */
+    .observation-deck {
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 15px;
+      border: 2px solid #eee;
+      text-align: center;
+    }
+    .current-pic {
+      width: 100%;
+      height: 220px;
+      object-fit: cover;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      border: 3px solid #ddd;
+    }
+    .feature-tag {
+      display: flex;
+      justify-content: space-between;
+      background: white;
+      margin: 8px 0;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      border-left: 5px solid var(--blue);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    /* 神經網路視覺化 */
+    .network-viz {
+      position: relative;
+      height: 450px;
+      background: var(--bg);
+      border-radius: 15px;
+      overflow: hidden;
+    }
+    .layer {
+      position: absolute;
+      top: 0; bottom: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 2;
+      width: 100px;
+    }
+    .layer-input { left: 8%; }
+    .layer-hidden { left: 45%; }
+    .layer-output { left: 82%; }
+
+    .neuron {
+      width: 65px;
+      height: 65px;
+      border-radius: 50%;
+      border: 2px solid white;
+      background: rgba(255,255,255,0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 11px;
+      transition: 0.3s;
+      text-align: center;
+      line-height: 1.2;
+    }
+    .neuron.active {
+      background: var(--gold);
+      color: #000;
+      box-shadow: 0 0 25px var(--gold);
+      border-color: #fff;
+    }
+    .neuron-val { font-weight: bold; font-size: 16px; margin-top: 2px; }
+
+    svg { position: absolute; top:0; left:0; width:100%; height:100%; z-index:1; }
+
+    /* 控制區 */
+    .controls {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 0.8fr;
+      gap: 20px;
+      margin-top: 25px;
+    }
+    .weight-group {
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 12px;
+      border: 1px solid #ddd;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    .weight-title {
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #333;
+      display: block;
+      border-bottom: 2px solid #ddd;
+      padding-bottom: 6px;
+    }
+
+    /* ✅ 右側預測區：做成側欄卡片，並 sticky 讓大多解析度不用捲到底 */
+    .prediction-panel {
+      position: sticky;
+      top: 20px;
+    }
+
+    /* 原本 prediction-zone 是橫向：改成側欄直向更省高度 */
+    .prediction-zone {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      align-items: stretch;
+      padding: 18px;
+      background: #fff;
+      border: 2px solid var(--blue);
+      border-radius: 15px;
+    }
+
+    .prob-container { width: 100%; text-align: center; }
+    .prob-bar {
+      height: 12px;
+      background: #eee;
+      border-radius: 6px;
+      overflow: hidden;
+      margin: 8px 0;
+    }
+    .prob-fill { height: 100%; background: var(--blue); transition: width 0.5s; }
+
+    .result-box {
+      text-align: center;
+      padding: 10px 8px;
+      border-radius: 12px;
+      background: #f7fbff;
+      border: 1px dashed rgba(52,152,219,0.5);
+    }
+
+    /* ✅ 響應式：螢幕比較窄就上下堆疊，避免擠壓神經網路與滑桿 */
+    @media (max-width: 1220px) {
+      .content-grid { grid-template-columns: 1fr; }
+      .prediction-panel { position: static; }
+      .prediction-zone { flex-direction: row; align-items: center; justify-content: space-around; }
+      .prob-container { width: 150px; }
+      .result-box { background: transparent; border: 0; padding: 0; }
+    }
+
+    @media (max-width: 980px) {
+      .controls { grid-template-columns: 1fr; }
+      .main-layout { grid-template-columns: 1fr; }
+      .prediction-zone { flex-direction: column; }
+      .prob-container { width: 100%; }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <h2 style="margin:0 0 15px 0; color:#2c3e50;">🧠 深度學習實驗室：特徵是如何被組合的？</h2>
+
+    <!-- ✅ 新增：左右兩欄，右側放 prediction-zone -->
+    <div class="content-grid">
+      <div class="left-col">
+        <div class="main-layout">
+          <div class="observation-deck">
+            <strong style="display:block; margin-bottom:10px;">📸 觀察輸入資料</strong>
+            <img :src="currentSample.img" class="current-pic" />
+            <div class="feature-tag"><span>耳朵尖銳度</span> <strong>{{currentSample.ears}}</strong></div>
+            <div class="feature-tag"><span>體型大小</span> <strong>{{currentSample.size}}</strong></div>
+            <div class="feature-tag"><span>瞳孔形狀</span> <strong>{{currentSample.eye}}</strong></div>
+            <p style="font-size:12px; color:#777; margin-top:15px; line-height:1.5;">
+              AI 會將照片轉為數字，<br />再輸入進左側的神經元。
+            </p>
+          </div>
+
+          <div class="network-viz">
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+              <template v-for="i in 3">
+                <line
+                  v-for="j in 3"
+                  :x1="12"
+                  :y1="16.5 + (i-1)*33.3"
+                  :x2="49"
+                  :y2="16.5 + (j-1)*33.3"
+                  :stroke="getW1(i,j) >= 0 ? '#3498db' : '#e74c3c'"
+                  :stroke-width="Math.abs(getW1(i,j))*1.8 + 0.3"
+                  stroke-opacity="0.7"
+                />
+              </template>
+              <template v-for="i in 3">
+                <line
+                  v-for="j in 2"
+                  :x1="49"
+                  :y1="16.5 + (i-1)*33.3"
+                  :x2="86"
+                  :y2="25 + (j-1)*50"
+                  :stroke="getW2(i,j) >= 0 ? '#3498db' : '#e74c3c'"
+                  :stroke-width="Math.abs(getW2(i,j))*1.8 + 0.3"
+                  stroke-opacity="0.7"
+                />
+              </template>
+            </svg>
+
+            <div class="layer layer-input">
+              <div class="neuron active">耳朵<div class="neuron-val">{{currentSample.ears}}</div></div>
+              <div class="neuron active">體型<div class="neuron-val">{{currentSample.size}}</div></div>
+              <div class="neuron active">瞳孔<div class="neuron-val">{{currentSample.eye}}</div></div>
+            </div>
+
+            <div class="layer layer-hidden">
+              <div v-for="(h, idx) in [h1, h2, h3]" :class="['neuron', {active: h > 0}]">
+                中間特徵 H{{idx+1}}
+                <div class="neuron-val">{{h.toFixed(1)}}</div>
+              </div>
+            </div>
+
+            <div class="layer layer-output" style="padding:50px 0;">
+              <div :class="['neuron', {active: outCat > outDog}]">貓咪分數<div class="neuron-val">{{outCat.toFixed(1)}}</div></div>
+              <div :class="['neuron', {active: outDog > outCat}]">狗狗分數<div class="neuron-val">{{outDog.toFixed(1)}}</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <div class="weight-group">
+            <span class="weight-title">1️⃣ 調整中間層 (特徵組合)</span>
+            <div v-for="(v, k) in weights1" style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+              <span style="width:100px; font-size:11px; color:#555;">{{k}}</span>
+              <input type="range" v-model.number="weights1[k]" min="-1" max="1" step="0.1" />
+              <span style="width:30px; font-family:monospace; font-weight:bold;">{{v > 0 ? '+' + v : v}}</span>
+            </div>
+          </div>
+
+          <div class="weight-group">
+            <span class="weight-title">2️⃣ 調整輸出層 (最終決策)</span>
+            <div v-for="(v, k) in weights2" style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+              <span style="width:80px; font-size:11px; color:#555;">{{k}}</span>
+              <input type="range" v-model.number="weights2[k]" min="-1" max="1" step="0.1" />
+              <span style="width:30px; font-family:monospace; font-weight:bold;">{{v > 0 ? '+' + v : v}}</span>
+            </div>
+          </div>
+
+          <div class="weight-group" style="background:#fff;">
+            <span class="weight-title">🎯 切換測試案例</span>
+            <button
+              v-for="(s, index) in samples"
+              @click="currentIndex = index"
+              :style="{
+                display:'block',
+                width:'100%',
+                marginBottom:'10px',
+                padding:'12px',
+                borderRadius:'8px',
+                border: currentIndex===index ? '3px solid var(--blue)' : '1px solid #ccc',
+                background: currentIndex===index ? '#e8f4fd' : '#fff',
+                cursor:'pointer',
+                fontWeight: currentIndex===index ? 'bold' : 'normal'
+              }"
+            >
+              {{s.name}}
+            </button>
+
+            <div style="font-size:11px; color:#999; line-height:1.4; margin-top:10px;">
+              💡 提示：試著讓貓的權重為正、狗的權重為負，看看會發生什麼事！
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ✅ 右側：prediction-zone -->
+      <aside class="right-col prediction-panel">
+        <div class="prediction-zone">
+          <div class="prob-container" :style="{opacity: outCat > outDog ? 1 : 0.4}">
+            <strong>🐱 貓咪機率</strong>
+            <div class="prob-bar"><div class="prob-fill" :style="{width: catProb + '%'}"></div></div>
+            <span style="font-size:20px; font-weight:bold;">{{catProb}}%</span>
+          </div>
+
+          <div class="result-box">
+            <div style="font-size:14px; color:#666; margin-bottom:6px;">AI 判斷結果</div>
+            <div :style="{fontSize:'28px', fontWeight:'900', color: outCat > outDog ? 'var(--blue)' : '#e67e22'}">
+              {{ outCat > outDog ? '✨ 這是一隻 貓咪！' : '🐾 這是一隻 狗狗！' }}
+            </div>
+          </div>
+
+          <div class="prob-container" :style="{opacity: outDog > outCat ? 1 : 0.4}">
+            <strong>🐶 狗狗機率</strong>
+            <div class="prob-bar"><div class="prob-fill" :style="{width: dogProb + '%', background:'#e67e22'}"></div></div>
+            <span style="font-size:20px; font-weight:bold;">{{dogProb}}%</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const { createApp } = Vue;
+    createApp({
+      data() {
+        return {
+          currentIndex: 0,
+          samples: [
+            { name: "樣本 A (溫順小貓)", img: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=400", ears: 9, size: 2, eye: 9 },
+            { name: "樣本 B (威猛大狗)", img: "https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?w=400", ears: 2, size: 9, eye: 2 },
+            { name: "樣本 C (神祕生物?)", img: "https://images.unsplash.com/photo-1519052537078-e6302a4968d4?w=400", ears: 7, size: 6, eye: 4 }
+          ],
+          // 重新排列權重，以 H1, H2, H3 為組，讓連線與控制項對應
+          weights1: {
+            "耳朵 → H1": 0.6, "體型 → H1": -0.3, "瞳孔 → H1": 0.2,
+            "耳朵 → H2": -0.1, "體型 → H2": 0.7, "瞳孔 → H2": -0.2,
+            "耳朵 → H3": 0.2, "體型 → H3": 0.1, "瞳孔 → H3": 0.6
+          },
+          weights2: {
+            "H1 → 貓咪": 0.8, "H1 → 狗狗": -0.7,
+            "H2 → 貓咪": -0.6, "H2 → 狗狗": 0.9,
+            "H3 → 貓咪": 0.5, "H3 → 狗狗": -0.3
+          }
+        };
+      },
+      computed: {
+        currentSample() { return this.samples[this.currentIndex]; },
+        // 運算邏輯依照 H1, H2, H3 的順序抓取權重
+        h1() { const w = Object.values(this.weights1); return this.relu(this.currentSample.ears*w[0] + this.currentSample.size*w[1] + this.currentSample.eye*w[2]); },
+        h2() { const w = Object.values(this.weights1); return this.relu(this.currentSample.ears*w[3] + this.currentSample.size*w[4] + this.currentSample.eye*w[5]); },
+        h3() { const w = Object.values(this.weights1); return this.relu(this.currentSample.ears*w[6] + this.currentSample.size*w[7] + this.currentSample.eye*w[8]); },
+        outCat() { const w = Object.values(this.weights2); return (this.h1*w[0] + this.h2*w[2] + this.h3*w[4]); },
+        outDog() { const w = Object.values(this.weights2); return (this.h1*w[1] + this.h2*w[3] + this.h3*w[5]); },
+        catProb() {
+          const eC = Math.exp(this.outCat);
+          const eD = Math.exp(this.outDog);
+          return Math.round((eC / (eC + eD)) * 100);
+        },
+        dogProb() { return 100 - this.catProb; }
+      },
+      methods: {
+        relu(v) { return v > 0 ? v : 0; },
+        // 提供給 SVG 畫線用的輔助函數，確保連線位置正確
+        getW1(i, j) {
+          // i 是 input(1,2,3), j 是 hidden(1,2,3)
+          // weights1 的存儲順序是 (H1的來源, H2的來源, H3的來源)
+          // 所以對應關係是 weights1[(j-1)*3 + (i-1)]
+          return Object.values(this.weights1)[(j-1)*3 + (i-1)];
+        },
+        getW2(i, j) {
+          // i 是 hidden(1,2,3), j 是 output(1,2)
+          return Object.values(this.weights2)[(i-1)*2 + (j-1)];
+        }
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
