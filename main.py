@@ -1,5 +1,5 @@
 # python ./data_server/app_example.py
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, send_from_directory
 print("載入 opencv...")
 import cv2
 import numpy as np
@@ -41,6 +41,14 @@ def detect_image(source_image, save_detected=True):
     else:
         print("[debug] 儲存影像失敗")
     return label
+
+@app.route("/")
+def index():
+    return "Cloudflare is working!"
+
+@app.route("/deep-learning")
+def deep_learning():
+    return send_from_directory("templates", "deep-learning-demo.html")
     
 @app.route("/esp32/capture", methods=["GET", "POST"])
 def esp32_capture():
