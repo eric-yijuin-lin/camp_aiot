@@ -21,10 +21,14 @@
 // ===========================
 // Enter your WiFi credentials
 // ===========================
-const char* ssid     = "iPhone-YJL";
-const char* password = "12345678";
+// const char* ssid     = "iPhone-YJL";
+// const char* password = "12345678";
 
-String serverName = "http://172.20.10.2:5000";   // REPLACE WITH YOUR Raspberry Pi IP ADDRESS
+const char* ssid     = "DLINK_6021";
+const char* password = "cshs1234";
+
+// String serverName = "http://172.20.10.2:5000";   // REPLACE WITH YOUR Raspberry Pi IP ADDRESS
+String serverName = "http://192.168.0.60:5000";   // REPLACE WITH YOUR Raspberry Pi IP ADDRESS
 //String serverName = "example.com";   // OR REPLACE WITH YOUR DOMAIN NAME
 
 
